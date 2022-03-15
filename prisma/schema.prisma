@@ -8,13 +8,26 @@ generator client {
 }
 
 model User {
-  // the user model
+  id             Int         @id @default(autoincrement())
+  name           String
+  email          String      @unique
+  emailConfirmed Boolean     @map("email_confirmed") @default(false)
+  isAdmin        Boolean     @map("is_admin") @default(false)
+  credentials    Credentials @relation(fields: [credentialsId], references: [id])
+  credentialsId  Int  @map("credentials_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @default(now()) @map("updated_at")
+
 
   @@map("users")
 }
 
 model Credentials {
-  // the credentials model
+  id        Int      @id @default(autoincrement())
+  hash      String
+  User User?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
 
   @@map("credentials")
 }
