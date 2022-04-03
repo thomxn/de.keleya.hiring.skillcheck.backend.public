@@ -29,6 +29,8 @@ export class QueryExceptionFilter {
       name,
     };
 
+    console.log(exception);
+
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(msg);
   }
 }

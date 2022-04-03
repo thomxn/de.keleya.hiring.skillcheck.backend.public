@@ -1,1 +1,4 @@
-export class AuthenticateUserDto {}
+export class AuthenticateUserDto {
+  readonly email: string
+  readonly password: string
+}

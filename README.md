@@ -76,4 +76,10 @@ yarn test
 ```
 ### Your Notes Below Here
 
-...
+### Improvements
+
+1. user delete endpoint can have the id passed as path parameter rather than request body
+2. JWT related methods are inside `user.service`. This is really weird because it violates Single Responsibility, Open for Extension and Closed for Mutation in SOLID principles. In future, if we want to sign and pass as reset email token in JWT form, this design is really inefficient.
+3. There is no difference between `authenticate` and `token` endpoint. The should be granted their token in the authenticate API iteslf.
+4. Also, refresh token API is missing
+5. Foreign key violation in delete method. I can't seem to fix it. It's something related to my schema definition

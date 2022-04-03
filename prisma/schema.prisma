@@ -13,7 +13,8 @@ model User {
   email          String      @unique
   emailConfirmed Boolean     @map("email_confirmed") @default(false)
   isAdmin        Boolean     @map("is_admin") @default(false)
-  credentials    Credentials @relation(fields: [credentialsId], references: [id])
+  isDeleted      Boolean     @map("is_deleted") @default(false)
+  credentials    Credentials? @relation(fields: [credentialsId], references: [id])
   credentialsId  Int  @map("credentials_id")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @default(now()) @map("updated_at")

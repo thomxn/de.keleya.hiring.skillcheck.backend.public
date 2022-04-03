@@ -1,4 +1,12 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import {
+  Body,
+  Injectable,
+  ConflictException,
+  Post,
+  UnauthorizedException,
+  ConsoleLogger,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma.services';
@@ -7,10 +15,17 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { DeleteUserDto } from './dto/delete-user.dto';
 import { FindUserDto } from './dto/find-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserSearchClause, UserUpdatePayload, JWTPayload } from './dto/interfaces';
+import { hashPassword, matchHashedPassword } from '../common/utils/password';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService, private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly appConfig: ConfigService,
+  ) {}
 
   /**
    * Finds users with matching fields
@@ -19,80 +34,126 @@ export class UserService {
    * @returns User[]
    */
   async find(findUserDto: FindUserDto): Promise<User[]> {
-    throw new NotImplementedException();
+    const { id, name, email, updatedSince, limit, offset, credentials } = findUserDto;
+    const searchClause: UserSearchClause = {};
+    if (email) searchClause.email = { contains: email };
+    if (name) searchClause.name = { contains: name };
+    if (updatedSince) searchClause.updated_at = { gte: new Date(findUserDto.updatedSince) };
+    if (id) searchClause.id = { in: id.map((_id) => Number(_id)) };
+    const users = await this.prisma.user.findMany({
+      skip: offset ? Number(offset) : undefined,
+      take: limit ? Number(limit) : undefined,
+      where: searchClause,
+      include: { credentials: credentials },
+    });
+
+    return users;
   }
 
-  /**
-   * Finds single User by id, name or email
-   *
-   * @param whereUnique
-   * @returns User
-   */
-  async findUnique(whereUnique: Prisma.UserWhereUniqueInput, includeCredentials = false) {
-    throw new NotImplementedException();
+  async findUnique(whereUnique: Prisma.UserWhereUniqueInput) {
+    const user = await this.prisma.user.findUnique({
+      where: whereUnique,
+    });
+    return user;
   }
 
-  /**
-   * Creates a new user with credentials
-   *
-   * @param createUserDto
-   * @returns result of create
-   */
-  async create(createUserDto: CreateUserDto) {
-    throw new NotImplementedException();
+  @Post('user')
+  async create(@Body() createUserDto: CreateUserDto) {
+    const { email, name, isAdmin } = createUserDto;
+    if (await this.emailExists(email)) throw new ConflictException('Email is taken');
+    const hashedPassword = await hashPassword(createUserDto.password);
+    return await this.prisma.user.create({
+      data: {
+        name,
+        email,
+        emailConfirmed: false,
+        isAdmin: isAdmin,
+        credentials: {
+          create: {
+            hash: hashedPassword,
+          },
+        },
+      },
+    });
   }
 
-  /**
-   * Updates a user unless it does not exist or has been marked as deleted before
-   *
-   * @param updateUserDto
-   * @returns result of update
-   */
   async update(updateUserDto: UpdateUserDto) {
-    throw new NotImplementedException();
+    const { id, name, email, password } = updateUserDto;
+    const user = await this.findUnique({ id });
+    if (!user) return null;
+    if (user.isDeleted) return null;
+    const payload: UserUpdatePayload = {};
+    if (name) payload.name = name;
+    if (email) {
+      if (await this.emailExists(email)) throw new ConflictException('Email is taken');
+      payload.email = email;
+    }
+    if (password) {
+      const hash = hashPassword(password);
+      payload.credentials = { credentials: { update: { where: { id: user.credentialsId }, data: { hash } } } };
+    }
+    const response = await this.prisma.user.update({ where: { id }, data: payload });
+    const res = { ...response, createdAt: response.createdAt, updatedAt: response.updatedAt };
+    return res;
   }
 
-  /**
-   * Deletes a user
-   * Function does not actually remove the user from database but instead marks them as deleted by:
-   * - removing the corresponding `credentials` row from your db
-   * - changing the name to DELETED_USER_NAME constant (default: `(deleted)`)
-   * - setting email to NULL
-   *
-   * @param deleteUserDto
-   * @returns results of users and credentials table modification
-   */
   async delete(deleteUserDto: DeleteUserDto) {
-    throw new NotImplementedException();
+    console.log('hitttt');
+    const { id } = deleteUserDto;
+    console.log(id);
+    const user = await this.findUnique({ id });
+    if (user.isDeleted) return null;
+    await this.prisma.user.update({
+      where: { id: deleteUserDto.id },
+      data: {
+        isDeleted: true,
+        // credentialsId: null,
+        credentials: {
+          delete: true
+        },
+      },
+    });
+
+    return { msg: 'user deleted' };
   }
 
-  /**
-   * Authenticates a user and returns a JWT token
-   *
-   * @param authenticateUserDto email and password for authentication
-   * @returns a JWT token
-   */
   async authenticateAndGetJwtToken(authenticateUserDto: AuthenticateUserDto) {
-    throw new NotImplementedException();
+    const authenticatedUser = await this.authCheck(authenticateUserDto);
+    if (!authenticatedUser) throw new UnauthorizedException();
+    const { id, email, isAdmin } = authenticatedUser;
+    const payload: JWTPayload = { id, email, isAdmin };
+    const token = await this.jwtService.signAsync(payload);
+    return { token };
   }
 
-  /**
-   * Authenticates a user
-   *
-   * @param authenticateUserDto email and password for authentication
-   * @returns true or false
-   */
+
   async authenticate(authenticateUserDto: AuthenticateUserDto) {
-    throw new NotImplementedException();
+    const authenticatedUser = await this.authCheck(authenticateUserDto);
+    if (!authenticatedUser) return { credentials: false };
+    return { credentials: true };
   }
 
-  /**
-   * Validates a JWT token
-   *
-   * @param token a JWT token
-   * @returns the decoded token if valid
-   */
+
   async validateToken(token: string) {
-    throw new NotImplementedException();
+    const secret = this.appConfig.get<string>('JWT_SECRET');
+    const decoded = await this.jwtService.verifyAsync(token, { secret });
+    if (decoded) return decoded;
+  }
+
+
+  async emailExists(email: string) {
+    return await this.prisma.user.findUnique({ where: { email } });
+  }
+
+  async authCheck(authenticateUserDto: AuthenticateUserDto): Promise<User> {
+    const { email, password } = authenticateUserDto;
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { credentials: true },
+    });
+    if (!user) return null;
+    const isValidPassword = await matchHashedPassword(password, user.credentials.hash);
+    if (!isValidPassword) return null;
+    return user;
   }
 }

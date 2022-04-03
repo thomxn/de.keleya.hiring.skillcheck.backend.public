@@ -1,9 +1,9 @@
 export interface JwtTokenUser {
-  username?: string | null;
+  email?: string | null;
   id: number | null;
 }
 
 export const isJwtTokenUser = (candidate: unknown): candidate is JwtTokenUser => {
   const user = candidate as JwtTokenUser;
-  return user.username !== undefined && user.id !== undefined;
+  return user.email !== undefined && user.id !== undefined;
 };
