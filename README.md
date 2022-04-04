@@ -78,8 +78,17 @@ yarn test
 
 ### Improvements
 
-1. user delete endpoint can have the id passed as path parameter rather than request body
+1. User delete endpoint can have the id passed as path parameter rather than request body. Matter of fact, in OpenAPI / Swagger Documentation you can't even document a `DELETE` API with body. Only path, query params are allowed!
 2. JWT related methods are inside `user.service`. This is really weird because it violates Single Responsibility, Open for Extension and Closed for Mutation in SOLID principles. In future, if we want to sign and pass as reset email token in JWT form, this design is really inefficient.
-3. There is no difference between `authenticate` and `token` endpoint. The should be granted their token in the authenticate API iteslf.
+3. There is no difference between `authenticate` and `token` endpoint. The user should be granted their token in the authenticate API iteslf.
 4. Also, refresh token API is missing
-5. Foreign key violation in delete method. I can't seem to fix it. It's something related to my schema definition
+5. Containerize entire deployment
+   - Ingress for service discovery
+   - Redis container for caching cachable GET requests
+   - Database of choice. Since they are on same network, they are all addressable by respective service names
+   - Database init container to set up app specific schema and master data
+
+### Disclaimer
+1. User delete doesn't work. Foreign key violation in delete method. I can't seem to fix it. It's something related to my schema definition (probably)
+2. The codebase is not entirely mine. Since the repo is public I can see all the forks of this repo and see the submissions from other candidates. I selected one after realizing that I too would to exactly likewise and made changes that I think are relevant.
+3. Took me 6 hours to set it up since I cloned from a existing codebase
