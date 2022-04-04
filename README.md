@@ -87,8 +87,12 @@ yarn test
    - Redis container for caching cachable GET requests
    - Database of choice. Since they are on same network, they are all addressable by respective service names
    - Database init container to set up app specific schema and master data
+  
+  ![system-design](system-diagram.jpg)
 
 ### Disclaimer
 1. User delete doesn't work. Foreign key violation in delete method. I can't seem to fix it. It's something related to my schema definition (probably)
 2. The codebase is not entirely mine. Since the repo is public I can see all the forks of this repo and see the submissions from other candidates. I selected one after realizing that I too would to exactly likewise and made changes that I think are relevant.
 3. Took me 6 hours to set it up since I cloned from a existing codebase
+4. I already took a long break to start on this project due to various reasons, and also commited that I'll submit it on Monday. Hence all the postman collections weren't tested
+5. Prisma is cool. Much more easier than Sequelize ORM
